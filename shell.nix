@@ -1,13 +1,10 @@
 with (import /home/danielbarter/nixpkgs {});
 
-mkShell rec {
-  buildInputs = [ clang
-                  gcc
-                  gsl
-                  lldb
-                  gdb
-                  valgrind
-                ];
-
-  CPATH = lib.makeSearchPathOutput "dev" "include" [ clang.libc gsl ];
+let pythonEnv = python38.withPackages (
+      ps: [ps.numpy
+           ps.scipy
+           ps.jupyterlab
+          ]);
+in mkShell rec {
+  buildInputs = [pythonEnv];
 }
