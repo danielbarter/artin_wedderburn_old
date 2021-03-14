@@ -46,7 +46,7 @@ class ArtinWedderburn:
             if abs(s[i]) < self.threshold:
                 counter += 1
 
-        center_inclusion = v_inverse[:,counter:]
+        center_inclusion = v_inverse[:,d - counter:]
         self.center_inclusion = center_inclusion
         center_dimension = center_inclusion.shape[1]
 
