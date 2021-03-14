@@ -41,15 +41,14 @@ class ArtinWedderburn:
         # this means that the center basis vectors will the last columns of v_inverse
         # whrere singular values are below threshold
 
-        #TODO fix this. Should do a numpy slice
-        center_basis = []
+        counter = 0
         for i in range(len(s)):
             if abs(s[i]) < self.threshold:
-                center_basis.append(v_inverse[:,i])
+                counter += 1
 
-
-        self.center_inclusion = np.column_stack(center_basis)
-        center_dimension = len(center_basis)
+        center_inclusion = v_inverse[:,counter:]
+        self.center_inclusion = center_inclusion
+        center_dimension = center_inclusion.shape[1]
 
 
         change_codomain_basis = np.tensordot(m, v, (2,1))
@@ -133,16 +132,16 @@ class ArtinWedderburn:
         # the basis for the block is the columns of u whose singular value
         # is above the threshold
 
-        #TODO fix this
-        block_basis = []
+        counter = 0
         for i in range(len(s)):
-            if s[i] > self.threshold:
-                block_basis.append(u[:,i])
+            if abs(s[i]) > self.threshold:
+                counter += 1
 
-        self.block_inclusions[idempotent_index] = np.column_stack(block_basis)
+        block_inclusion = u[:,:counter]
+        self.block_inclusions[idempotent_index] = block_inclusion
 
 
-        block_dimension = len(block_basis)
+        block_dimension = block_inclusion.shape[1]
         m = algebra.multiplication
         d = algebra.dimension
 

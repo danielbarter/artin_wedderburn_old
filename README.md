@@ -16,8 +16,12 @@ ArtinWedderburn takes a multiplication tensor and unit vector and computes the i
 
 ### usage
 
-
-![example](landing.png)
+```
+from ArtinWedderburn import *
+alg = symmetric_group_algebra(3)
+svd_threshold = 0.00001
+aw = ArtinWedderburn(alg,svd_threshold)
+```
 
 Algebra objects can be constructed using `Algebra(dimension, multiplication, unit)` where `multiplication` is a numpy array with shape `(dimension,dimension,dimension)` and `unit` is a numpy vector with length `dimension`.
 
