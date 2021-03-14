@@ -161,6 +161,7 @@ class ArtinWedderburn:
 
         unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
         print("SVD unit defect:", format_error(unit_defect))
+        self.total_defect += unit_defect
 
 
         pre_block = Algebra(
