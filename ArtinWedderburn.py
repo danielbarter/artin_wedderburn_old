@@ -248,7 +248,10 @@ class ArtinWedderburn:
     def __init__(self, algebra, threshold):
         self.algebra = algebra
         self.threshold = threshold
-        self.total_defect = 0.0
+        self.total_defect = algebra.algebra_defect()
+
+        print("algebra defect:", self.total_defect)
+        print("")
 
         print("computing center...")
         self.compute_center()
