@@ -1,15 +1,30 @@
 from ArtinWedderburn import *
-svd_threshold = 0.00001
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
-print("irreps for S2")
-ArtinWedderburn(symmetric_group_algebra(2),svd_threshold)
-print("\n\n\n")
+def pass_fail(aw, threshold=1.0e-10):
+    if aw.total_defect < threshold:
+        print(bcolors.OKGREEN + "passed" + bcolors.ENDC)
+    else:
+        print(bcolors.FAIL + "failed" + bcolors.ENDC)
 
-print("irreps for S3")
-ArtinWedderburn(symmetric_group_algebra(3),svd_threshold)
-print("\n\n\n")
+print("irreps for S2: ",end='')
+aw2 = ArtinWedderburn(symmetric_group_algebra(2))
+pass_fail(aw2)
 
+print("irreps for S3: ",end='')
+aw3 = ArtinWedderburn(symmetric_group_algebra(3))
+pass_fail(aw3)
 
-print("irreps for S4")
-ArtinWedderburn(symmetric_group_algebra(4),svd_threshold)
+print("irreps for S4: ", end='')
+aw4 = ArtinWedderburn(symmetric_group_algebra(4))
+pass_fail(aw4)

@@ -67,13 +67,13 @@ class ArtinWedderburn:
                                                 d-center_dimension:d,
                                                 0:d-center_dimension]))
 
-        print("SVD multiplication defect:",format_error(m_defect))
+        self.log("SVD multiplication defect:",format_error(m_defect))
         self.total_defect += m_defect
 
         unit_rotated = np.tensordot(unit, v, (0,1))
 
         unit_defect = np.sum(np.abs(unit_rotated[0:d-center_dimension]))
-        print("SVD unit defect:", format_error(unit_defect))
+        self.log("SVD unit defect:", format_error(unit_defect))
         self.total_defect += unit_defect
 
         center = Algebra(center_dimension,
@@ -85,12 +85,12 @@ class ArtinWedderburn:
         self.center = center
 
         center_defect = center.algebra_defect()
-        print("center defect:", format_error(center_defect))
+        self.log("center defect:", format_error(center_defect))
         self.total_defect += center_defect
 
 
         center_commutative_defect = center.commutative_defect()
-        print("center commutative defect:", format_error(center_commutative_defect))
+        self.log("center commutative defect:", format_error(center_commutative_defect))
         self.total_defect += center_commutative_defect
 
 
@@ -111,7 +111,7 @@ class ArtinWedderburn:
                         central_idempotents[:,i],
                         central_idempotents[:,j])))
 
-        print("central idempotent defect:", format_error(central_idempotent_defect))
+        self.log("central idempotent defect:", format_error(central_idempotent_defect))
         self.total_defect += central_idempotent_defect
 
         self.central_idempotents = central_idempotents
@@ -154,13 +154,13 @@ class ArtinWedderburn:
                                             0:block_dimension,
                                             block_dimension:d]))
 
-        print("SVD multiplication defect:", format_error(m_defect))
+        self.log("SVD multiplication defect:", format_error(m_defect))
         self.total_defect += m_defect
 
         unit_rotated = np.tensordot(idempotent, u_inverse, (0,1))
 
         unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
-        print("SVD unit defect:", format_error(unit_defect))
+        self.log("SVD unit defect:", format_error(unit_defect))
         self.total_defect += unit_defect
 
 
@@ -181,7 +181,7 @@ class ArtinWedderburn:
             pre_block.unit / factor)
 
         block_defect = block.algebra_defect()
-        print("block defect:", format_error(block_defect))
+        self.log("block defect:", format_error(block_defect))
         self.total_defect += block_defect
 
 
@@ -231,7 +231,7 @@ class ArtinWedderburn:
 
             block_irrep = m_rotated[:,0:sqrt_dimension,0:sqrt_dimension]
 
-        print("SVD defect:", format_error(m_defect))
+        self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
 
@@ -239,28 +239,31 @@ class ArtinWedderburn:
         self.irreps[block_index] = irrep
 
         irrep_defect = self.algebra.irrep_defect(irrep)
-        print("irrep defect:", format_error(irrep_defect))
+        self.log("irrep defect:", format_error(irrep_defect))
         self.total_defect += irrep_defect
 
 
+    def log(self,*args, **kwargs):
+        if self.logging:
+            print(*args, **kwargs)
 
-
-    def __init__(self, algebra, threshold):
+    def __init__(self, algebra, threshold = 1.0e-5, logging = False):
         self.algebra = algebra
         self.threshold = threshold
+        self.logging = logging
         self.total_defect = algebra.algebra_defect()
 
-        print("algebra defect:", self.total_defect)
-        print("")
+        self.log("algebra defect:", self.total_defect)
+        self.log("")
 
-        print("computing center...")
+        self.log("computing center...")
         self.compute_center()
-        print("")
+        self.log("")
 
         # really, we only compute the central idempotents upto scalar multiplication
-        print("computing central idempotents...")
+        self.log("computing central idempotents...")
         self.compute_central_idempotents()
-        print("")
+        self.log("")
 
 
         self.blocks = {}
@@ -268,31 +271,31 @@ class ArtinWedderburn:
         # the block inclusions are unitary, so to project onto a block
         # take the conjugate transpose of the inclusion
         self.block_inclusions = {}
-        print("computing blocks...")
-        print("")
+        self.log("computing blocks...")
+        self.log("")
         for i in range(self.center.dimension):
-            print("computing block ", i)
+            self.log("computing block ", i)
             self.compute_block(i)
-            print("")
+            self.log("")
 
 
         self.irreps = {}
         self.irrep_dimensions = {}
-        print("computing irreps...")
-        print("")
+        self.log("computing irreps...")
+        self.log("")
 
         for i in range(self.center.dimension):
-            print("computing irrep", i)
+            self.log("computing irrep", i)
             self.compute_irrep(i)
-            print("")
+            self.log("")
 
-        print("all done!")
-        print("total defect:", format_error(self.total_defect))
+        self.log("all done!")
+        self.log("total defect:", format_error(self.total_defect))
 
-        print("irrep tensors are stored in the attribute self.irrep")
-        print(self.center.dimension, "irreducible representations with dimensions")
+        self.log("irrep tensors are stored in the attribute self.irrep")
+        self.log(self.center.dimension, "irreducible representations with dimensions")
         for index, dim in self.irrep_dimensions.items():
-            print(index, ":", dim)
+            self.log(index, ":", dim)
 
 
 
