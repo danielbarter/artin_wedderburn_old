@@ -11,8 +11,8 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def pass_fail(aw, threshold=1.0e-10):
-    if aw.total_defect < threshold:
+def pass_fail(aw, defect_threshold=1.0e-10):
+    if aw.total_defect < defect_threshold:
         print(bcolors.OKGREEN + "passed" + bcolors.ENDC)
     else:
         print(bcolors.FAIL + "failed" + bcolors.ENDC)
