@@ -238,6 +238,8 @@ class ArtinWedderburn:
         self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
+        #TODO: extract an indecomposable idempotent from the block irrep
+
 
         irrep = np.tensordot(projection, block_irrep, (0,0))
         self.irreps[block_index] = irrep
@@ -247,7 +249,9 @@ class ArtinWedderburn:
         self.total_defect += irrep_defect
 
 
+    #TODO: write a function which validates that central idempotents sum to the unit and multiply correctly
     #TODO: write a function to validate the irreps using the central idempotents
+
 
     def log(self,*args, **kwargs):
         if self.logging:
