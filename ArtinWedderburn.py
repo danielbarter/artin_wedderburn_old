@@ -94,31 +94,32 @@ class ArtinWedderburn:
         self.total_defect += center_commutative_defect
 
 
-    def compute_central_idempotents(self):
+    def compute_unscaled_central_idempotents(self):
         algebra = self.algebra
         center = self.center
         center_inclusion = self.center_inclusion
         v = center.random_vector()
         lv = center.left_multiplication_matrix(v)
         eigenvectors = eig(lv)[1]
-        central_idempotents = np.dot(center_inclusion, eigenvectors)
+        unscaled_central_idempotents = np.dot(center_inclusion, eigenvectors)
 
-        central_idempotent_defect = 0.0
+        unscaled_central_idempotent_defect = 0.0
         for i in range(center.dimension):
             for j in range(center.dimension):
                 if i != j:
-                    central_idempotent_defect += np.abs(np.sum(algebra.multiply(
-                        central_idempotents[:,i],
-                        central_idempotents[:,j])))
+                    unscaled_central_idempotent_defect += np.abs(np.sum(algebra.multiply(
+                        unscaled_central_idempotents[:,i],
+                        unscaled_central_idempotents[:,j])))
 
-        self.log("central idempotent defect:", format_error(central_idempotent_defect))
-        self.total_defect += central_idempotent_defect
+        self.log("unscaled central idempotent defect:",
+                 format_error(unscaled_central_idempotent_defect))
+        self.total_defect += unscaled_central_idempotent_defect
 
-        self.central_idempotents = central_idempotents
+        self.unscaled_central_idempotents = unscaled_central_idempotents
 
     def compute_block(self, idempotent_index):
         algebra = self.algebra
-        idempotent = self.central_idempotents[:,idempotent_index]
+        idempotent = self.unscaled_central_idempotents[:,idempotent_index]
         left_multiplication = algebra.left_multiplication_matrix(idempotent)
 
 
@@ -184,8 +185,11 @@ class ArtinWedderburn:
         self.log("block defect:", format_error(block_defect))
         self.total_defect += block_defect
 
+        central_idempotent = np.dot(block_inclusion,block.unit)
+
 
         self.blocks[idempotent_index] = block
+        self.central_idempotents[idempotent_index] = central_idempotent
 
 
     def compute_irrep(self,block_index):
@@ -243,6 +247,8 @@ class ArtinWedderburn:
         self.total_defect += irrep_defect
 
 
+    #TODO: write a function to validate the irreps using the central idempotents
+
     def log(self,*args, **kwargs):
         if self.logging:
             print(*args, **kwargs)
@@ -260,13 +266,15 @@ class ArtinWedderburn:
         self.compute_center()
         self.log("")
 
-        # really, we only compute the central idempotents upto scalar multiplication
-        self.log("computing central idempotents...")
-        self.compute_central_idempotents()
+        # really, this only computes the central idempotents upto scalar multiplication
+        # we compute the central idempotents on the nose while computing the blocks
+        self.log("computing unscaled central idempotents...")
+        self.compute_unscaled_central_idempotents()
         self.log("")
 
 
         self.blocks = {}
+        self.central_idempotents = {}
 
         # the block inclusions are unitary, so to project onto a block
         # take the conjugate transpose of the inclusion
