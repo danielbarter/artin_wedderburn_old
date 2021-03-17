@@ -2,7 +2,9 @@ import numpy as np
 
 from itertools import permutations
 from math import factorial, sqrt
-from scipy.linalg import svd,eig
+from scipy.linalg import svd, eig, inv
+# inv is only used once for each block to compute
+# the indecompsable idempotent corresponding to a rep
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -238,8 +240,9 @@ class ArtinWedderburn:
         self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
-        #TODO: extract an indecomposable idempotent from the block irrep
-
+        block_irrep_flattened = np.transpose(block_irrep.reshape(block.dimension, block.dimension))
+        block_irrep_inverted = inv(block_irrep_flattened)
+        self.indecomposable_idempotents[block_index] = np.dot(inclusion,block_irrep_inverted[:,0])
 
         irrep = np.tensordot(projection, block_irrep, (0,0))
         self.irreps[block_index] = irrep
@@ -249,8 +252,57 @@ class ArtinWedderburn:
         self.total_defect += irrep_defect
 
 
-    #TODO: write a function which validates that central idempotents sum to the unit and multiply correctly
-    #TODO: write a function to validate the irreps using the central idempotents
+    def central_idempotent_defect(self):
+        center = self.center
+        algebra = self.algebra
+        central_idempotents = self.central_idempotents
+        defect_mat = np.zeros((center.dimension, center.dimension))
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j])))
+                else:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j]) - central_idempotents[i]))
+
+        id_defect = np.copy(algebra.unit)
+        for i in range(center.dimension):
+            id_defect -= central_idempotents[i]
+
+        return np.sum(defect_mat) + np.sum(np.abs(id_defect))
+
+
+    def central_idempotent_irrep_defect(self):
+        center = self.center
+        central_idempotents = self.central_idempotents
+        irreps = self.irreps
+
+        defect_mat = np.zeros((center.dimension, center.dimension))
+
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                idempotent = central_idempotents[i]
+                irrep = irreps[j]
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(np.tensordot(
+                        idempotent,
+                        irrep,
+                        (0,0))))
+
+                else:
+                    mat = np.tensordot(
+                        central_idempotents[i],
+                        irreps[j],
+                        (0,0))
+
+                    mat -= np.identity(irrep.shape[-1])
+
+                    defect_mat[i,j] = np.sum(np.abs(mat))
+
+        return np.sum(defect_mat)
 
 
     def log(self,*args, **kwargs):
@@ -279,6 +331,7 @@ class ArtinWedderburn:
 
         self.blocks = {}
         self.central_idempotents = {}
+        self.indecomposable_idempotents = {}
 
         # the block inclusions are unitary, so to project onto a block
         # take the conjugate transpose of the inclusion
@@ -302,6 +355,17 @@ class ArtinWedderburn:
             self.log("")
 
         self.log("all done!")
+
+        central_idempotent_defect = self.central_idempotent_defect()
+        self.log("central idempotent defect:", format_error(central_idempotent_defect))
+        self.total_defect += central_idempotent_defect
+
+        central_idempotent_irrep_cross_defect = self.central_idempotent_irrep_defect()
+        self.log("central idempotent irrep cross defect:",
+                 format_error(central_idempotent_irrep_cross_defect))
+        self.total_defect += central_idempotent_irrep_cross_defect
+
+
         self.log("total defect:", format_error(self.total_defect))
 
         self.log("irrep tensors are stored in the attribute self.irrep")
