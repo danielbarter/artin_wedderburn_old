@@ -2,7 +2,9 @@ import numpy as np
 
 from itertools import permutations
 from math import factorial, sqrt
-from scipy.linalg import svd,eig
+from scipy.linalg import svd, eig, inv
+# inv is only used once for each block to compute
+# the indecompsable idempotent corresponding to a rep
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -41,15 +43,14 @@ class ArtinWedderburn:
         # this means that the center basis vectors will the last columns of v_inverse
         # whrere singular values are below threshold
 
-        #TODO fix this. Should do a numpy slice
-        center_basis = []
+        counter = 0
         for i in range(len(s)):
             if abs(s[i]) < self.threshold:
-                center_basis.append(v_inverse[:,i])
+                counter += 1
 
-
-        self.center_inclusion = np.column_stack(center_basis)
-        center_dimension = len(center_basis)
+        center_inclusion = v_inverse[:,d - counter:]
+        self.center_inclusion = center_inclusion
+        center_dimension = center_inclusion.shape[1]
 
 
         change_codomain_basis = np.tensordot(m, v, (2,1))
@@ -68,13 +69,13 @@ class ArtinWedderburn:
                                                 d-center_dimension:d,
                                                 0:d-center_dimension]))
 
-        print("SVD multiplication defect:",format_error(m_defect))
+        self.log("SVD multiplication defect:",format_error(m_defect))
         self.total_defect += m_defect
 
         unit_rotated = np.tensordot(unit, v, (0,1))
 
         unit_defect = np.sum(np.abs(unit_rotated[0:d-center_dimension]))
-        print("SVD unit defect:", format_error(unit_defect))
+        self.log("SVD unit defect:", format_error(unit_defect))
         self.total_defect += unit_defect
 
         center = Algebra(center_dimension,
@@ -86,40 +87,41 @@ class ArtinWedderburn:
         self.center = center
 
         center_defect = center.algebra_defect()
-        print("center defect:", format_error(center_defect))
+        self.log("center defect:", format_error(center_defect))
         self.total_defect += center_defect
 
 
         center_commutative_defect = center.commutative_defect()
-        print("center commutative defect:", format_error(center_commutative_defect))
+        self.log("center commutative defect:", format_error(center_commutative_defect))
         self.total_defect += center_commutative_defect
 
 
-    def compute_central_idempotents(self):
+    def compute_unscaled_central_idempotents(self):
         algebra = self.algebra
         center = self.center
         center_inclusion = self.center_inclusion
         v = center.random_vector()
         lv = center.left_multiplication_matrix(v)
         eigenvectors = eig(lv)[1]
-        central_idempotents = np.dot(center_inclusion, eigenvectors)
+        unscaled_central_idempotents = np.dot(center_inclusion, eigenvectors)
 
-        central_idempotent_defect = 0.0
+        unscaled_central_idempotent_defect = 0.0
         for i in range(center.dimension):
             for j in range(center.dimension):
                 if i != j:
-                    central_idempotent_defect += np.abs(np.sum(algebra.multiply(
-                        central_idempotents[:,i],
-                        central_idempotents[:,j])))
+                    unscaled_central_idempotent_defect += np.abs(np.sum(algebra.multiply(
+                        unscaled_central_idempotents[:,i],
+                        unscaled_central_idempotents[:,j])))
 
-        print("central idempotent defect:", format_error(central_idempotent_defect))
-        self.total_defect += central_idempotent_defect
+        self.log("unscaled central idempotent defect:",
+                 format_error(unscaled_central_idempotent_defect))
+        self.total_defect += unscaled_central_idempotent_defect
 
-        self.central_idempotents = central_idempotents
+        self.unscaled_central_idempotents = unscaled_central_idempotents
 
     def compute_block(self, idempotent_index):
         algebra = self.algebra
-        idempotent = self.central_idempotents[:,idempotent_index]
+        idempotent = self.unscaled_central_idempotents[:,idempotent_index]
         left_multiplication = algebra.left_multiplication_matrix(idempotent)
 
 
@@ -133,16 +135,16 @@ class ArtinWedderburn:
         # the basis for the block is the columns of u whose singular value
         # is above the threshold
 
-        #TODO fix this
-        block_basis = []
+        counter = 0
         for i in range(len(s)):
-            if s[i] > self.threshold:
-                block_basis.append(u[:,i])
+            if abs(s[i]) > self.threshold:
+                counter += 1
 
-        self.block_inclusions[idempotent_index] = np.column_stack(block_basis)
+        block_inclusion = u[:,:counter]
+        self.block_inclusions[idempotent_index] = block_inclusion
 
 
-        block_dimension = len(block_basis)
+        block_dimension = block_inclusion.shape[1]
         m = algebra.multiplication
         d = algebra.dimension
 
@@ -155,13 +157,14 @@ class ArtinWedderburn:
                                             0:block_dimension,
                                             block_dimension:d]))
 
-        print("SVD multiplication defect:", format_error(m_defect))
+        self.log("SVD multiplication defect:", format_error(m_defect))
         self.total_defect += m_defect
 
         unit_rotated = np.tensordot(idempotent, u_inverse, (0,1))
 
         unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
-        print("SVD unit defect:", format_error(unit_defect))
+        self.log("SVD unit defect:", format_error(unit_defect))
+        self.total_defect += unit_defect
 
 
         pre_block = Algebra(
@@ -181,11 +184,14 @@ class ArtinWedderburn:
             pre_block.unit / factor)
 
         block_defect = block.algebra_defect()
-        print("block defect:", format_error(block_defect))
+        self.log("block defect:", format_error(block_defect))
         self.total_defect += block_defect
+
+        central_idempotent = np.dot(block_inclusion,block.unit)
 
 
         self.blocks[idempotent_index] = block
+        self.central_idempotents[idempotent_index] = central_idempotent
 
 
     def compute_irrep(self,block_index):
@@ -231,65 +237,141 @@ class ArtinWedderburn:
 
             block_irrep = m_rotated[:,0:sqrt_dimension,0:sqrt_dimension]
 
-        print("SVD defect:", format_error(m_defect))
+        self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
+        block_irrep_flattened = np.transpose(block_irrep.reshape(block.dimension, block.dimension))
+        block_irrep_inverted = inv(block_irrep_flattened)
+        self.indecomposable_idempotents[block_index] = np.dot(inclusion,block_irrep_inverted[:,0])
 
         irrep = np.tensordot(projection, block_irrep, (0,0))
         self.irreps[block_index] = irrep
 
         irrep_defect = self.algebra.irrep_defect(irrep)
-        print("irrep defect:", format_error(irrep_defect))
+        self.log("irrep defect:", format_error(irrep_defect))
         self.total_defect += irrep_defect
 
 
+    def central_idempotent_defect(self):
+        center = self.center
+        algebra = self.algebra
+        central_idempotents = self.central_idempotents
+        defect_mat = np.zeros((center.dimension, center.dimension))
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j])))
+                else:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j]) - central_idempotents[i]))
+
+        id_defect = np.copy(algebra.unit)
+        for i in range(center.dimension):
+            id_defect -= central_idempotents[i]
+
+        return np.sum(defect_mat) + np.sum(np.abs(id_defect))
 
 
-    def __init__(self, algebra, threshold):
+    def central_idempotent_irrep_defect(self):
+        center = self.center
+        central_idempotents = self.central_idempotents
+        irreps = self.irreps
+
+        defect_mat = np.zeros((center.dimension, center.dimension))
+
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                idempotent = central_idempotents[i]
+                irrep = irreps[j]
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(np.tensordot(
+                        idempotent,
+                        irrep,
+                        (0,0))))
+
+                else:
+                    mat = np.tensordot(
+                        central_idempotents[i],
+                        irreps[j],
+                        (0,0))
+
+                    mat -= np.identity(irrep.shape[-1])
+
+                    defect_mat[i,j] = np.sum(np.abs(mat))
+
+        return np.sum(defect_mat)
+
+
+    def log(self,*args, **kwargs):
+        if self.logging:
+            print(*args, **kwargs)
+
+    def __init__(self, algebra, threshold = 1.0e-5, logging = False):
         self.algebra = algebra
         self.threshold = threshold
-        self.total_defect = 0.0
+        self.logging = logging
+        self.total_defect = algebra.algebra_defect()
 
-        print("computing center...")
+        self.log("algebra defect:", self.total_defect)
+        self.log("")
+
+        self.log("computing center...")
         self.compute_center()
-        print("")
+        self.log("")
 
-        # really, we only compute the central idempotents upto scalar multiplication
-        print("computing central idempotents...")
-        self.compute_central_idempotents()
-        print("")
+        # really, this only computes the central idempotents upto scalar multiplication
+        # we compute the central idempotents on the nose while computing the blocks
+        self.log("computing unscaled central idempotents...")
+        self.compute_unscaled_central_idempotents()
+        self.log("")
 
 
         self.blocks = {}
+        self.central_idempotents = {}
+        self.indecomposable_idempotents = {}
 
         # the block inclusions are unitary, so to project onto a block
         # take the conjugate transpose of the inclusion
         self.block_inclusions = {}
-        print("computing blocks...")
-        print("")
+        self.log("computing blocks...")
+        self.log("")
         for i in range(self.center.dimension):
-            print("computing block ", i)
+            self.log("computing block ", i)
             self.compute_block(i)
-            print("")
+            self.log("")
 
 
         self.irreps = {}
         self.irrep_dimensions = {}
-        print("computing irreps...")
-        print("")
+        self.log("computing irreps...")
+        self.log("")
 
         for i in range(self.center.dimension):
-            print("computing irrep", i)
+            self.log("computing irrep", i)
             self.compute_irrep(i)
-            print("")
+            self.log("")
 
-        print("all done!")
-        print("total defect:", format_error(self.total_defect))
+        self.log("all done!")
 
-        print("irrep tensors are stored in the attribute self.irrep")
-        print(self.center.dimension, "irreducible representations with dimensions")
+        central_idempotent_defect = self.central_idempotent_defect()
+        self.log("central idempotent defect:", format_error(central_idempotent_defect))
+        self.total_defect += central_idempotent_defect
+
+        central_idempotent_irrep_cross_defect = self.central_idempotent_irrep_defect()
+        self.log("central idempotent irrep cross defect:",
+                 format_error(central_idempotent_irrep_cross_defect))
+        self.total_defect += central_idempotent_irrep_cross_defect
+
+
+        self.log("total defect:", format_error(self.total_defect))
+
+        self.log("irrep tensors are stored in the attribute self.irrep")
+        self.log(self.center.dimension, "irreducible representations with dimensions")
         for index, dim in self.irrep_dimensions.items():
-            print(index, ":", dim)
+            self.log(index, ":", dim)
 
 
 
