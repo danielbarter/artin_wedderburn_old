@@ -30,6 +30,7 @@ Percent of CPU this job got: 716%
 Elapsed (wall clock) time (h:mm:ss or m:ss): 0:56.55
 Maximum resident set size (kbytes): 9816812
 ```
+The 10GB max ram usage occours while constructing the multiplication tensor for S5. While computing the irreducible representations, the ram usage is approximately 3GB.
 
 Algebra objects can be constructed using `Algebra(dimension, multiplication, unit)` where `multiplication` is a numpy array with shape `(dimension,dimension,dimension)` and `unit` is a numpy vector with length `dimension`.
 
