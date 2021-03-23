@@ -1,4 +1,5 @@
 import numpy as np
+import sparse
 
 from itertools import permutations
 from math import factorial, sqrt
@@ -457,6 +458,91 @@ class Algebra:
         self.unit = unit
 
 
+class SparseAlgebra:
+
+    def associative_defect(self):
+        m = self.multiplication
+        return np.sum(np.abs(np.tensordot(m,m,(2,0)) -
+                             np.transpose(np.tensordot(m,m,(1,2)),(0,2,3,1))))
+
+    def left_identity_defect(self):
+        m = self.multiplication
+        return np.sum(
+            np.abs(np.tensordot(self.unit, m, (0,0)) -
+                   np.identity(self.dimension)))
+
+    def right_identity_defect(self):
+        m = self.multiplication
+        return np.sum(
+            np.abs(np.tensordot(self.unit, m, (0,1)) -
+                   np.identity(self.dimension)))
+
+
+    def commutative_defect(self):
+        m = self.multiplication
+        return np.sum(np.abs(m - np.transpose(m,(1,0,2))))
+
+    def algebra_defect(self):
+        return sum([self.associative_defect(),
+                    self.left_identity_defect(),
+                    self.right_identity_defect()])
+
+    def irrep_defect_multiplication(self,irrep):
+        m = self.multiplication
+        result = np.sum(np.abs(np.tensordot(m, irrep, (2,0)) -
+                               np.transpose(np.tensordot(irrep, irrep, (2,1)),(2,0,1,3))))
+        return result
+
+    def irrep_defect_identity(self,irrep):
+        m = self.multiplication
+        result = np.sum(np.abs(np.tensordot(self.unit, irrep, (0,0)) - np.identity(irrep.shape[1])))
+        return result
+
+    def irrep_defect(self,irrep):
+        return self.irrep_defect_multiplication(irrep) + self.irrep_defect_identity(irrep)
+
+    def multiply(self,x,y):
+        m = self.multiplication
+        return np.tensordot(np.tensordot(x,m,(0,0)),y,(0,0))
+
+    def random_vector(self):
+        d = self.dimension
+        return (np.random.rand(d) - 0.5 ) + 1j * (np.random.rand(d) - 0.5 )
+
+    def commutator_matrix(self):
+        d = self.dimension
+        m = self.multiplication
+        return np.transpose(np.reshape(m - np.transpose(m,(1,0,2)),(d,d*d)))
+
+    def left_multiplication_matrix(self,v):
+        m = self.multiplication
+        return np.transpose(np.tensordot(v, m, (0,0)))
+
+    def right_multiplication_matrix(self,v):
+        m = self.multiplication
+        return np.transpose(np.tensordot(v,m,(0,1)))
+
+    def __init__(
+            self,
+            dimension,
+            multiplication,
+            unit):
+
+        # dimension of algebra
+        # we denote the basis vectors as e_1, e_2, ...., e_dimension
+        self.dimension = dimension
+
+        # multiplication tensor (3D numpy array)
+        # e_i e_j = sum over k multiplication[i,j,k] e_k
+        # stored as a sparse tensor
+        self.multiplication = multiplication
+
+        # unit of the algebra in the given basis
+        # stored as a sparse tensor
+        self.unit = unit
+
+
+
 # we represent a permutation as an n-tuple containing the numbers 0,1,...,n-1
 # if we think of such a tuple as a function from indices to values
 # then permutations are composed via function composition as follows
@@ -492,3 +578,48 @@ def symmetric_group_algebra(n):
             multiplication[i,j,permutation_to_index[pk]] = 1.0
 
     return Algebra(dimension, multiplication, unit)
+
+
+def sparse_symmetric_group_algebra(n):
+    dimension = factorial(n)
+    multiplication = []
+    unit = []
+
+
+    permutation_to_index = {}
+    index_to_permutation = {}
+    index = 0
+
+
+
+    for permutation in permutations(range(n)):
+        permutation_to_index[permutation] = index
+        index_to_permutation[index] = permutation
+        index += 1
+
+
+    identity_permutation = tuple(range(n))
+    unit.append(
+        ((permutation_to_index[identity_permutation],),1.0))
+
+    for i in range(dimension):
+        for j in range(dimension):
+            pi = index_to_permutation[i]
+            pj = index_to_permutation[j]
+            pk = multiply_permutations(pi,pj)
+
+            multiplication.append(
+                ((i,j,permutation_to_index[pk]), 1.0))
+
+    algebra = SparseAlgebra(dimension,
+                            sparse.COO.from_iter(
+                                multiplication,
+                                shape = (dimension,dimension,dimension),
+                                dtype = complex),
+                            sparse.COO.from_iter(
+                                unit,
+                                shape = (dimension,),
+                                dtype = complex))
+
+
+    return algebra
