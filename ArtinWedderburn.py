@@ -3,12 +3,10 @@ import sparse
 
 from itertools import permutations
 from math import factorial, sqrt
-from scipy.linalg import svd, eig, inv
+from scipy.linalg import svd, eig, eigh, inv
 # inv is only used once for each block to compute
 # the indecompsable idempotent corresponding to a rep
 
-# sparse svd
-from scipy.sparse.linalg import svds
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -37,13 +35,19 @@ class ArtinWedderburn:
         d = algebra.dimension
 
         if algebra.is_sparse:
-            u,s,v = svd(algebra.commutator_matrix().todense())
+            cm = algebra.commutator_matrix()
+            cm_conj_times_cm = np.dot(np.transpose(np.conj(cm)), cm)
+            s_reversed, v_inverse_reversed = eigh(cm_conj_times_cm.todense())
+            s = np.flip(s_reversed,axis=0)
+            v_inverse = np.flip(v_inverse_reversed, axis=1)
+            v = np.transpose(np.conj(v_inverse))
+
         else:
-            u,s,v = svd(algebra.commutator_matrix())
-        # v is the change of basis matrix from our old basis to our new basis
-        # v is unitary, so inverse is conjugate transpose
-        # v_inverse is the change of basis from our new basis to our old basis
-        v_inverse = np.transpose(np.conj(v))
+            _,s,v = svd(algebra.commutator_matrix())
+            # v is the change of basis matrix from our old basis to our new basis
+            # v is unitary, so inverse is conjugate transpose
+            # v_inverse is the change of basis from our new basis to our old basis
+            v_inverse = np.transpose(np.conj(v))
 
         # the singular values in s are in non increasing order
         # this means that the center basis vectors will the last columns of v_inverse
@@ -57,7 +61,6 @@ class ArtinWedderburn:
         center_inclusion = v_inverse[:,d - counter:]
         self.center_inclusion = center_inclusion
         center_dimension = center_inclusion.shape[1]
-
 
         change_codomain_basis = np.tensordot(m, v, (2,1))
         change_left_basis = np.tensordot(v_inverse,
