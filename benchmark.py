@@ -7,5 +7,5 @@ if len(sys.argv) != 2:
 
 
 from ArtinWedderburn import *
-alg = symmetric_group_algebra(int(sys.argv[1]))
+alg = sparse_symmetric_group_algebra(int(sys.argv[1]))
 aw = ArtinWedderburn(alg, logging=True)

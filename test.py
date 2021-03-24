@@ -28,3 +28,15 @@ pass_fail(aw3)
 print("irreps for S4: ", end='')
 aw4 = ArtinWedderburn(symmetric_group_algebra(4))
 pass_fail(aw4)
+
+print("irreps for sparse S2: ",end='')
+aw2s = ArtinWedderburn(sparse_symmetric_group_algebra(2))
+pass_fail(aw2)
+
+print("irreps for sparse S3: ",end='')
+aw3s = ArtinWedderburn(sparse_symmetric_group_algebra(3))
+pass_fail(aw3)
+
+print("irreps for sparse S4: ", end='')
+aw4s = ArtinWedderburn(sparse_symmetric_group_algebra(4))
+pass_fail(aw4)
