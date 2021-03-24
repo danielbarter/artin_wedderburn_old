@@ -3,7 +3,11 @@ sys.path.append("../")
 
 from ArtinWedderburn import *
 
-with open("test.txt",'r') as f:
+if len(sys.argv) != 2:
+    print("usage: python run_jacobs_algebra.py file")
+    exit()
+
+with open(sys.argv[1],'r') as f:
     lines = f.readlines()
 
 identity_vec = [int(x) for x in lines[0].split(' ')]
