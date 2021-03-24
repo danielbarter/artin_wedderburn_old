@@ -32,3 +32,4 @@ for line in multiplication_lines:
 mult = sparse.COO.from_iter(multiplication_coefficients, shape=(dim,dim,dim), dtype=complex)
 
 alg = Algebra(dim, mult, unit, is_sparse=True)
+ArtinWedderburn(alg, logging=True)
