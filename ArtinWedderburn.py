@@ -7,6 +7,8 @@ from scipy.linalg import svd, eig, inv
 # inv is only used once for each block to compute
 # the indecompsable idempotent corresponding to a rep
 
+# sparse svd
+from scipy.sparse.linalg import svds
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
