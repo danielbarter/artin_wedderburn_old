@@ -16,24 +16,23 @@ ArtinWedderburn takes a multiplication tensor and unit vector and computes the i
 
 ### usage
 
+You can compute the irreducible representations of S4 as follows:
+
 ```
 from ArtinWedderburn import *
-alg = symmetric_group_algebra(5)
+alg = symmetric_group_algebra(4)
 aw = ArtinWedderburn(alg, logging=True)
 ```
 
-Currently, on a Ryzen 5 2400G, this runs with the following performance characteristics:
-```
-User time (seconds): 402.71
-System time (seconds): 2.66
-Percent of CPU this job got: 716%
-Elapsed (wall clock) time (h:mm:ss or m:ss): 0:56.55
-Maximum resident set size (kbytes): 9816812
-```
-The 10GB max ram usage occours while constructing the multiplication tensor for S5. While computing the irreducible representations, the ram usage is approximately 3GB.
+if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 6: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
 
-Algebra objects can be constructed using `Algebra(dimension, multiplication, unit)` where `multiplication` is a numpy array with shape `(dimension,dimension,dimension)` and `unit` is a numpy vector with length `dimension`.
+```
+python benchmark.py small_tube_algebras
+```
+
+This runs in 5377 seconds with a max ram usage of 16.5GB on a Intel Xeon W-1290 CPU.
+
 
 ### dependencies
 
-ArtinWedderburn uses `numpy` for tensor arithmetic and `scipy` for SVDs and computing eigenvalues. It should work with any recent versions of those libraries.
+ArtinWedderburn uses `numpy` for tensor arithmetic, `sparse` for sparse tensor arithmetic and `scipy` for SVDs and computing eigenvalues. It should work with any recent versions of those libraries.
