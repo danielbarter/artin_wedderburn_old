@@ -24,13 +24,13 @@ alg = symmetric_group_algebra(4)
 aw = ArtinWedderburn(alg, logging=True)
 ```
 
-if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 6: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
+if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 7: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
 
 ```
 python benchmark.py small_tube_algebras
 ```
 
-This runs in 5377 seconds with a max ram usage of 16.5GB on a Intel Xeon W-1290 CPU.
+This runs in 6 minutes with a max ram usage of 16.5GB on a Intel Xeon W-1290 CPU.
 
 
 ### dependencies
