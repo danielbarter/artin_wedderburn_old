@@ -1,6 +1,6 @@
 import sys
 import os
-from ArtinWedderburn2 import *
+from ArtinWedderburnV2 import *
 
 
 if len(sys.argv) != 2:
