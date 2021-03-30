@@ -417,7 +417,6 @@ class Algebra:
         return result
 
     def irrep_defect_identity(self,irrep):
-        m = self.multiplication
         result = np.sum(np.abs(np.tensordot(self.unit, irrep, (0,0)) - np.identity(irrep.shape[1])))
         return result
 
