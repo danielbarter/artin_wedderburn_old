@@ -1,13 +1,29 @@
 import numpy as np
 import scipy.sparse as sparse
-from scipy.linalg import eigh
+from scipy.linalg import eigh, eig
+
+# takes an array of complex numbers and removes duplicates upto threshold
+def fuzzy_filter(array, threshold):
+    result = []
+    for x in array:
+        already_seen = False
+        for v in result:
+            if abs(x-v) < threshold:
+                already_seen = True
+                break
+
+        if not already_seen:
+            result.append(x)
+
+    return result
+
 
 def format_error(x):
     return str.format('{0:1.0e}' ,x)
 
 class ArtinWedderburn:
     def compute_center(self):
-        algebra = self.sparse_algebra
+        algebra = self.algebra
         d = algebra.dimension
 
         cm = algebra.commutator_matrix()
@@ -37,12 +53,85 @@ class ArtinWedderburn:
         self.total_defect += center_defect
 
 
+    def compute_unscaled_central_idempotents(self):
+        algebra = self.algebra
+        center = self.center
+        center_inclusion = self.center_inclusion
+        v = center.random_vector()
+        lv = center.left_multiplication_matrix(v)
+        eigenvectors = eig(lv)[1]
+        unscaled_central_idempotents = np.dot(center_inclusion, eigenvectors)
+
+        unscaled_central_idempotent_defect = 0.0
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                if i != j:
+                    unscaled_central_idempotent_defect += np.abs(np.sum(algebra.multiply(
+                        unscaled_central_idempotents[:,i],
+                        unscaled_central_idempotents[:,j])))
+
+        self.log("unscaled central idempotent defect:",
+                 format_error(unscaled_central_idempotent_defect))
+        self.total_defect += unscaled_central_idempotent_defect
+
+        self.unscaled_central_idempotents = unscaled_central_idempotents
+
+
+    def compute_block(self, idempotent_index):
+        algebra = self.algebra
+        idempotent = self.unscaled_central_idempotents[:,idempotent_index]
+        left_multiplication = algebra.left_multiplication_matrix(idempotent)
+
+
+        # u is the change of basis from new basis to old basis
+        u,s,v =  svd(left_multiplication)
+
+        # u is unitary, so inverse is conjugate transpose
+        # u_inverse is change of basis from old basis to new basis
+        u_inverse = np.transpose(np.conj(u))
+
+        # the basis for the block is the columns of u whose singular value
+        # is above the threshold
+
+        counter = 0
+        for i in range(len(s)):
+            if abs(s[i]) > self.threshold:
+                counter += 1
+
+        block_inclusion = u[:,:counter]
+        self.block_inclusions[idempotent_index] = block_inclusion
+
+
+        block_dimension = block_inclusion.shape[1]
+        m = algebra.multiplication
+        d = algebra.dimension
+
+        change_codomain_basis = np.tensordot(m,u_inverse, (2,1))
+        change_left_basis = np.tensordot(u,change_codomain_basis,(0,0))
+        m_rotated_anti = np.tensordot(u,change_left_basis,(0,1))
+        m_rotated = np.transpose(m_rotated_anti, (1,0,2))
+
+        m_defect =  np.sum(np.abs(m_rotated[0:block_dimension,
+                                            0:block_dimension,
+                                            block_dimension:d]))
+
+        self.log("SVD multiplication defect:", format_error(m_defect))
+        self.total_defect += m_defect
+
+        unit_rotated = np.tensordot(idempotent, u_inverse, (0,1))
+
+        unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
+        self.log("SVD unit defect:", format_error(unit_defect))
+        self.total_defect += unit_defect
+
+
+
     def log(self,*args, **kwargs):
         if self.logging:
             print(*args, **kwargs)
 
     def __init__(self, sparse_algebra, threshold = 1.0e-5, logging = False):
-        self.sparse_algebra = sparse_algebra
+        self.algebra = sparse_algebra
         self.threshold = threshold
         self.logging = logging
         self.total_defect = sparse_algebra.algebra_defect()
@@ -53,6 +142,25 @@ class ArtinWedderburn:
         self.log("computing center...")
         self.compute_center()
         self.log("")
+
+        self.log("computing unscaled central idempotents...")
+        self.compute_unscaled_central_idempotents()
+        self.log("")
+
+        self.blocks = {}
+        self.central_idempotents = {}
+
+        # the block inclusions are unitary, so to project onto a block
+        # take the conjugate transpose of the inclusion
+        self.block_inclusions = {}
+        self.log("computing blocks...")
+        self.log("")
+        for i in range(self.center.dimension):
+            self.log("computing block ", i)
+            self.compute_block(i)
+            self.log("")
+
+
 
 
 
@@ -79,6 +187,29 @@ class SparseAlgebra:
                     self.associative_defect(),
                     self.left_identity_defect(),
                     self.right_identity_defect()])
+
+    def irrep_defect_multiplication(self,irrep):
+        x = self.random_vector()
+        y = self.random_vector()
+        xy = self.multiplication(x,y)
+        l = np.tensordot(xy, irrep, (0,0))
+        r_uneval = np.transpose(np.tensordot(irrep, irrep, (2,1)),(2,0,1,3))
+        r = np.tensordor(y, np.tensordot(x,r_uneval,(0,0)))
+        result = np.sum(np.abs(l - r))
+        return result
+
+
+    def irrep_defect_identity(self,irrep):
+        return np.sum(np.abs(np.tensordot(self.unit, irrep, (0,0)) - np.identity(irrep.shape[1])))
+
+    def irrep_defect(self,irrep):
+        return sum([ self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_identity(irrep)])
+
+    def multiply(self, x, y):
+        return self.multiplication_matrix * (np.kron(x,y)).flatten()
 
     def random_vector(self):
         d = self.dimension
@@ -114,8 +245,6 @@ class SparseAlgebra:
     def right_multiplication_matrix(self,v):
         return self.mult_helper(v, self.right_multiplication_matrices)
 
-    def multiply(self, x, y):
-        return self.multiplication_matrix * (np.kron(x,y)).flatten()
 
     def __init__(
             self,
