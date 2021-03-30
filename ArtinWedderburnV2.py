@@ -342,7 +342,7 @@ class SparseAlgebra:
         xy = self.multiply(x,y)
         l = np.tensordot(xy, irrep, (0,0))
         r_uneval = np.tensordot(irrep, irrep, (2,1))
-        r = np.tensordot(x, np.tensordot(y,r_uneval,(0,0)), (0,0))
+        r = np.tensordot(y, np.tensordot(x,r_uneval,(0,0)), (0,1))
         result = np.sum(np.abs(l - r))
         return result
 
