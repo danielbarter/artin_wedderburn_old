@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sparse
-from scipy.linalg import eigh, eig
+from scipy.linalg import eigh, eig, svd
+from math import factorial, sqrt
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -37,7 +38,7 @@ class ArtinWedderburn:
 
         center_multiplication = np.array([[ np.dot(
             center_projection,
-            algebra.multiply(v[:,i], v[:,j]))
+            algebra.multiply(center_inclusion[:,i], center_inclusion[:,j]))
            for i in range(center_dimension)]
          for j in range(center_dimension)])
 
@@ -100,29 +101,148 @@ class ArtinWedderburn:
 
         block_inclusion = u[:,:counter]
         self.block_inclusions[idempotent_index] = block_inclusion
-
-
+        block_projection = np.conj(np.transpose(block_inclusion))
         block_dimension = block_inclusion.shape[1]
-        m = algebra.multiplication
-        d = algebra.dimension
 
-        change_codomain_basis = np.tensordot(m,u_inverse, (2,1))
-        change_left_basis = np.tensordot(u,change_codomain_basis,(0,0))
-        m_rotated_anti = np.tensordot(u,change_left_basis,(0,1))
-        m_rotated = np.transpose(m_rotated_anti, (1,0,2))
 
-        m_defect =  np.sum(np.abs(m_rotated[0:block_dimension,
-                                            0:block_dimension,
-                                            block_dimension:d]))
+        block_multiplication = np.array([[ np.dot(
+            block_projection,
+            algebra.multiply(block_inclusion[:,i], block_inclusion[:,j]))
+           for i in range(block_dimension)]
+         for j in range(block_dimension)])
 
-        self.log("SVD multiplication defect:", format_error(m_defect))
+        block_pre_unit = np.dot(block_projection, idempotent)
+
+        pre_block = Algebra(
+            block_dimension,
+            block_multiplication,
+            block_pre_unit)
+
+        # we have only captured the identity upto scalar multiplication
+        # we need the identity on the node if we want to recover the correct scale
+        # for the representations
+        factor = pre_block.left_multiplication_matrix(pre_block.unit)[0,0]
+        block = Algebra(
+            pre_block.dimension,
+            pre_block.multiplication,
+            pre_block.unit / factor)
+
+        block_defect = block.algebra_defect()
+        self.log("block defect:", format_error(block_defect))
+        self.total_defect += block_defect
+
+        central_idempotent = np.dot(block_inclusion,block.unit)
+
+
+        self.blocks[idempotent_index] = block
+        self.central_idempotents[idempotent_index] = central_idempotent
+
+
+    def compute_irrep(self,block_index):
+
+        block = self.blocks[block_index]
+        sqrt_dimension = int(sqrt(block.dimension))
+        self.irrep_dimensions[block_index] = sqrt_dimension
+
+
+        inclusion = self.block_inclusions[block_index]
+        projection = np.transpose(np.conj(inclusion))
+
+        if block.dimension == 1:
+            block_irrep = block.multiplication
+            m_defect = 0.0
+
+        else:
+
+            v = block.random_vector()
+            vr = block.right_multiplication_matrix(v)
+            eigenvalues_with_repeats = eig(vr)[0]
+            eigenvalues = fuzzy_filter(eigenvalues_with_repeats,self.threshold)
+
+            accumulator = block.unit
+            for i in range(sqrt_dimension - 1):
+                accumulator = block.multiply(accumulator, v - eigenvalues[i] * block.unit)
+
+            proj = block.right_multiplication_matrix(accumulator)
+
+            # u goes from new basis to old basis
+            u, s, v = svd(proj)
+
+            # u_inverse goes from old basis to new basis
+            u_inverse = np.transpose(np.conj(u))
+
+
+            m = block.multiplication
+            change_codomain_basis = np.tensordot(m,u_inverse, (2,1))
+            m_rotated = np.transpose(np.tensordot(u,change_codomain_basis,(0,1)),(1,0,2))
+            m_defect = np.sum(np.abs(m_rotated[:,
+                                               0:sqrt_dimension,
+                                               sqrt_dimension:block.dimension]))
+
+            block_irrep = m_rotated[:,0:sqrt_dimension,0:sqrt_dimension]
+
+        self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
-        unit_rotated = np.tensordot(idempotent, u_inverse, (0,1))
+        irrep = np.tensordot(projection, block_irrep, (0,0))
+        self.irreps[block_index] = irrep
 
-        unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
-        self.log("SVD unit defect:", format_error(unit_defect))
-        self.total_defect += unit_defect
+        irrep_defect = self.algebra.irrep_defect(irrep)
+        self.log("irrep defect:", format_error(irrep_defect))
+        self.total_defect += irrep_defect
+
+    def central_idempotent_defect(self):
+        center = self.center
+        algebra = self.algebra
+        central_idempotents = self.central_idempotents
+        defect_mat = np.zeros((center.dimension, center.dimension))
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j])))
+                else:
+                    defect_mat[i,j] = np.sum(np.abs(algebra.multiply(
+                        central_idempotents[i],
+                        central_idempotents[j]) - central_idempotents[i]))
+
+        id_defect = np.copy(algebra.unit)
+
+        for i in range(center.dimension):
+            id_defect -= central_idempotents[i]
+
+        return np.sum(defect_mat) + np.sum(np.abs(id_defect))
+
+
+    def central_idempotent_irrep_defect(self):
+        center = self.center
+        central_idempotents = self.central_idempotents
+        irreps = self.irreps
+
+        defect_mat = np.zeros((center.dimension, center.dimension))
+
+        for i in range(center.dimension):
+            for j in range(center.dimension):
+                idempotent = central_idempotents[i]
+                irrep = irreps[j]
+                if i != j:
+                    defect_mat[i,j] = np.sum(np.abs(np.tensordot(
+                        idempotent,
+                        irrep,
+                        (0,0))))
+
+                else:
+                    mat = np.tensordot(
+                        central_idempotents[i],
+                        irreps[j],
+                        (0,0))
+
+                    mat -= np.identity(irrep.shape[-1])
+
+                    defect_mat[i,j] = np.sum(np.abs(mat))
+
+        return np.sum(defect_mat)
 
 
 
@@ -160,6 +280,34 @@ class ArtinWedderburn:
             self.compute_block(i)
             self.log("")
 
+        self.irreps = {}
+        self.irrep_dimensions = {}
+        self.log("computing irreps...")
+        self.log("")
+
+        for i in range(self.center.dimension):
+            self.log("computing irrep", i)
+            self.compute_irrep(i)
+            self.log("")
+
+        self.log("all done!")
+
+        central_idempotent_defect = self.central_idempotent_defect()
+        self.log("central idempotent defect:", format_error(central_idempotent_defect))
+        self.total_defect += central_idempotent_defect
+
+        central_idempotent_irrep_cross_defect = self.central_idempotent_irrep_defect()
+        self.log("central idempotent irrep cross defect:",
+                 format_error(central_idempotent_irrep_cross_defect))
+        self.total_defect += central_idempotent_irrep_cross_defect
+
+
+        self.log("total defect:", format_error(self.total_defect))
+
+        self.log("irrep tensors are stored in the attribute self.irreps")
+        self.log(self.center.dimension, "irreducible representations with dimensions")
+        for index, dim in self.irrep_dimensions.items():
+            self.log(index, ":", dim)
 
 
 
@@ -191,10 +339,10 @@ class SparseAlgebra:
     def irrep_defect_multiplication(self,irrep):
         x = self.random_vector()
         y = self.random_vector()
-        xy = self.multiplication(x,y)
+        xy = self.multiply(x,y)
         l = np.tensordot(xy, irrep, (0,0))
-        r_uneval = np.transpose(np.tensordot(irrep, irrep, (2,1)),(2,0,1,3))
-        r = np.tensordor(y, np.tensordot(x,r_uneval,(0,0)))
+        r_uneval = np.tensordot(irrep, irrep, (2,1))
+        r = np.tensordot(x, np.tensordot(y,r_uneval,(0,0)), (0,0))
         result = np.sum(np.abs(l - r))
         return result
 
@@ -340,8 +488,7 @@ class Algebra:
             self,
             dimension,
             multiplication,
-            unit,
-            is_sparse = False
+            unit
     ):
 
         # dimension of algebra
@@ -355,7 +502,6 @@ class Algebra:
         # unit of the algebra in the given basis
         self.unit = unit
 
-        self.is_sparse = is_sparse
 
 
 
