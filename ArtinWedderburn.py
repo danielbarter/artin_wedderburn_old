@@ -432,9 +432,14 @@ class SparseAlgebra:
 class Algebra:
 
     def associative_defect(self):
-        m = self.multiplication
-        return np.sum(np.abs(np.tensordot(m,m,(2,0)) -
-                             np.transpose(np.tensordot(m,m,(1,2)),(0,2,3,1))))
+        x = self.random_vector()
+        y = self.random_vector()
+        z = self.random_vector()
+        l = self.multiply(self.multiply(x,y), z)
+        r = self.multiply(x, self.multiply(y,z))
+        return np.sum(np.abs(l - r))
+
+
 
     def left_identity_defect(self):
         m = self.multiplication
@@ -455,6 +460,8 @@ class Algebra:
 
     def algebra_defect(self):
         return sum([self.associative_defect(),
+                    self.associative_defect(),
+                    self.associative_defect(),
                     self.left_identity_defect(),
                     self.right_identity_defect()])
 
