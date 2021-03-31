@@ -557,3 +557,21 @@ def symmetric_group_algebra(n):
     algebra.is_sparse = False
     return algebra
 
+def dump_sparse_algebra(a, path):
+    with open(path, 'w') as f:
+        for x in a.unit:
+            f.write(str(int(x)) + ' ')
+
+        f.write('\n')
+        for i in range(a.dimension):
+            for j in range(a.dimension):
+                for k in range(a.dimension):
+                    val = a.multiplication[i,j,k]
+                    if val != 0.0:
+                        f.write(str(i) + ' ')
+                        f.write(str(j) + ' ')
+                        f.write(str(k) + ' ')
+                        f.write(str(val.real) + ' ')
+                        f.write(str(val.imag) + '\n')
+
+
