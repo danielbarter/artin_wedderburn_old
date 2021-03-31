@@ -35,4 +35,4 @@ This runs in 2 minutes, 30 seconds with a max ram usage of 460MB on a Intel Xeon
 
 ### dependencies
 
-ArtinWedderburn uses `numpy` for tensor arithmetic, `sparse` for sparse tensor arithmetic and `scipy` for SVDs and computing eigenvalues. It should work with any recent versions of those libraries.
+ArtinWedderburn uses `numpy` for tensor arithmetic and `scipy` for sparse matrices, SVDs and computing eigenvalues. It should work with any recent versions of those libraries.
