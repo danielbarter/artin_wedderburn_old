@@ -505,7 +505,7 @@ class Algebra:
 
 
 
-def load_sparse_algebra_from_file(path):
+def load_algebra_from_file(path):
     with open(path,'r') as f:
         lines = f.readlines()
 
