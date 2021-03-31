@@ -1,10 +1,7 @@
 import numpy as np
-import sparse
-
-from itertools import permutations
+import scipy.sparse as sparse
+from scipy.linalg import eigh, eig, svd
 from math import factorial, sqrt
-from scipy.linalg import svd, eig, eigh
-
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -21,86 +18,40 @@ def fuzzy_filter(array, threshold):
 
     return result
 
+
 def format_error(x):
     return str.format('{0:1.0e}' ,x)
 
 class ArtinWedderburn:
-
     def compute_center(self):
         algebra = self.algebra
-        m = algebra.multiplication
-        unit = algebra.unit
         d = algebra.dimension
 
-        if algebra.is_sparse:
-            cm = algebra.commutator_matrix()
-            cm_conj_times_cm = np.dot(np.transpose(np.conj(cm)), cm)
-            s_reversed, v_inverse_reversed = eigh(cm_conj_times_cm.todense())
-            s = np.flip(s_reversed,axis=0)
-            v_inverse = np.flip(v_inverse_reversed, axis=1)
-            v = np.transpose(np.conj(v_inverse))
+        cm = algebra.commutator_matrix()
+        cm_transpose = cm.transpose()
+        cm_conj = cm_transpose.conj()
+        cm_conj_times_cm = cm_conj * cm
+        s, v = eigh(cm_conj_times_cm.todense())
+        center_dimension = len(np.where( np.abs(s) < self.threshold)[0])
+        center_inclusion = v[:,:center_dimension]
+        center_projection = np.transpose(np.conj(center_inclusion))
 
-        else:
-            _,s,v = svd(algebra.commutator_matrix())
-            # v is the change of basis matrix from our old basis to our new basis
-            # v is unitary, so inverse is conjugate transpose
-            # v_inverse is the change of basis from our new basis to our old basis
-            v_inverse = np.transpose(np.conj(v))
+        center_multiplication = np.array([[ np.dot(
+            center_projection,
+            algebra.multiply(center_inclusion[:,i], center_inclusion[:,j]))
+           for i in range(center_dimension)]
+         for j in range(center_dimension)])
 
-        # the singular values in s are in non increasing order
-        # this means that the center basis vectors will the last columns of v_inverse
-        # whrere singular values are below threshold
-
-        counter = 0
-        for i in range(len(s)):
-            if abs(s[i]) < self.threshold:
-                counter += 1
-
-        center_inclusion = v_inverse[:,d - counter:]
-        self.center_inclusion = center_inclusion
-        center_dimension = center_inclusion.shape[1]
-
-        change_codomain_basis = np.tensordot(m, v, (2,1))
-        change_left_basis = np.tensordot(v_inverse,
-                                         change_codomain_basis,
-                                         (0,0))
-
-        m_rotated_anti = np.tensordot(
-            v_inverse,
-            change_left_basis,
-            (0,1))
-
-        m_rotated = np.transpose(m_rotated_anti,(1,0,2))
-
-        m_defect = np.sum(np.abs(m_rotated[d-center_dimension:d,
-                                                d-center_dimension:d,
-                                                0:d-center_dimension]))
-
-        self.log("SVD multiplication defect:",format_error(m_defect))
-        self.total_defect += m_defect
-
-        unit_rotated = np.tensordot(unit, v, (0,1))
-
-        unit_defect = np.sum(np.abs(unit_rotated[0:d-center_dimension]))
-        self.log("SVD unit defect:", format_error(unit_defect))
-        self.total_defect += unit_defect
-
-        center = Algebra(center_dimension,
-                         m_rotated[d-center_dimension:d,
-                                   d-center_dimension:d,
-                                   d-center_dimension:d],
-                         unit_rotated[d-center_dimension:d])
+        center = Algebra(
+            center_dimension,
+            center_multiplication,
+            np.dot(center_projection, algebra.unit))
 
         self.center = center
-
-        center_defect = center.algebra_defect()
+        self.center_inclusion = center_inclusion
+        center_defect = center.algebra_defect() + center.commutative_defect()
         self.log("center defect:", format_error(center_defect))
         self.total_defect += center_defect
-
-
-        center_commutative_defect = center.commutative_defect()
-        self.log("center commutative defect:", format_error(center_commutative_defect))
-        self.total_defect += center_commutative_defect
 
 
     def compute_unscaled_central_idempotents(self):
@@ -126,6 +77,7 @@ class ArtinWedderburn:
 
         self.unscaled_central_idempotents = unscaled_central_idempotents
 
+
     def compute_block(self, idempotent_index):
         algebra = self.algebra
         idempotent = self.unscaled_central_idempotents[:,idempotent_index]
@@ -149,37 +101,22 @@ class ArtinWedderburn:
 
         block_inclusion = u[:,:counter]
         self.block_inclusions[idempotent_index] = block_inclusion
-
-
+        block_projection = np.conj(np.transpose(block_inclusion))
         block_dimension = block_inclusion.shape[1]
-        m = algebra.multiplication
-        d = algebra.dimension
 
-        change_codomain_basis = np.tensordot(m,u_inverse, (2,1))
-        change_left_basis = np.tensordot(u,change_codomain_basis,(0,0))
-        m_rotated_anti = np.tensordot(u,change_left_basis,(0,1))
-        m_rotated = np.transpose(m_rotated_anti, (1,0,2))
 
-        m_defect =  np.sum(np.abs(m_rotated[0:block_dimension,
-                                            0:block_dimension,
-                                            block_dimension:d]))
+        block_multiplication = np.array([[ np.dot(
+            block_projection,
+            algebra.multiply(block_inclusion[:,i], block_inclusion[:,j]))
+           for i in range(block_dimension)]
+         for j in range(block_dimension)])
 
-        self.log("SVD multiplication defect:", format_error(m_defect))
-        self.total_defect += m_defect
-
-        unit_rotated = np.tensordot(idempotent, u_inverse, (0,1))
-
-        unit_defect = np.sum(np.abs(unit_rotated[block_dimension:d]))
-        self.log("SVD unit defect:", format_error(unit_defect))
-        self.total_defect += unit_defect
-
+        block_pre_unit = np.dot(block_projection, idempotent)
 
         pre_block = Algebra(
             block_dimension,
-            m_rotated[0:block_dimension,
-                      0:block_dimension,
-                      0:block_dimension],
-            unit_rotated[0:block_dimension])
+            block_multiplication,
+            block_pre_unit)
 
         # we have only captured the identity upto scalar multiplication
         # we need the identity on the node if we want to recover the correct scale
@@ -254,7 +191,6 @@ class ArtinWedderburn:
         self.log("irrep defect:", format_error(irrep_defect))
         self.total_defect += irrep_defect
 
-
     def central_idempotent_defect(self):
         center = self.center
         algebra = self.algebra
@@ -271,10 +207,7 @@ class ArtinWedderburn:
                         central_idempotents[i],
                         central_idempotents[j]) - central_idempotents[i]))
 
-        if algebra.is_sparse:
-            id_defect = np.copy(algebra.unit).todense()
-        else:
-            id_defect = np.copy(algebra.unit)
+        id_defect = np.copy(algebra.unit)
 
         for i in range(center.dimension):
             id_defect -= central_idempotents[i]
@@ -312,15 +245,16 @@ class ArtinWedderburn:
         return np.sum(defect_mat)
 
 
+
     def log(self,*args, **kwargs):
         if self.logging:
             print(*args, **kwargs)
 
-    def __init__(self, algebra, threshold = 1.0e-5, logging = False):
-        self.algebra = algebra
+    def __init__(self, sparse_algebra, threshold = 1.0e-5, logging = False):
+        self.algebra = sparse_algebra
         self.threshold = threshold
         self.logging = logging
-        self.total_defect = algebra.algebra_defect()
+        self.total_defect = sparse_algebra.algebra_defect()
 
         self.log("algebra defect:", self.total_defect)
         self.log("")
@@ -329,12 +263,9 @@ class ArtinWedderburn:
         self.compute_center()
         self.log("")
 
-        # really, this only computes the central idempotents upto scalar multiplication
-        # we compute the central idempotents on the nose while computing the blocks
         self.log("computing unscaled central idempotents...")
         self.compute_unscaled_central_idempotents()
         self.log("")
-
 
         self.blocks = {}
         self.central_idempotents = {}
@@ -348,7 +279,6 @@ class ArtinWedderburn:
             self.log("computing block ", i)
             self.compute_block(i)
             self.log("")
-
 
         self.irreps = {}
         self.irrep_dimensions = {}
@@ -374,11 +304,120 @@ class ArtinWedderburn:
 
         self.log("total defect:", format_error(self.total_defect))
 
-        self.log("irrep tensors are stored in the attribute self.irrep")
+        self.log("irrep tensors are stored in the attribute self.irreps")
         self.log(self.center.dimension, "irreducible representations with dimensions")
         for index, dim in self.irrep_dimensions.items():
             self.log(index, ":", dim)
 
+
+
+
+class SparseAlgebra:
+    def associative_defect(self):
+        x = self.random_vector()
+        y = self.random_vector()
+        z = self.random_vector()
+        l = self.multiply(self.multiply(x,y), z)
+        r = self.multiply(x, self.multiply(y,z))
+        return np.sum(np.abs(l - r))
+
+    def left_identity_defect(self):
+        lm = self.left_multiplication_matrix(self.unit)
+        return np.sum(np.abs(lm - np.identity(self.dimension)))
+
+    def right_identity_defect(self):
+        rm = self.right_multiplication_matrix(self.unit)
+        return np.sum(np.abs(rm - np.identity(self.dimension)))
+
+    def algebra_defect(self):
+        return sum([self.associative_defect(),
+                    self.associative_defect(),
+                    self.associative_defect(),
+                    self.left_identity_defect(),
+                    self.right_identity_defect()])
+
+    def irrep_defect_multiplication(self,irrep):
+        x = self.random_vector()
+        y = self.random_vector()
+        xy = self.multiply(x,y)
+        l = np.tensordot(xy, irrep, (0,0))
+        r_uneval = np.tensordot(irrep, irrep, (2,1))
+        r = np.tensordot(y, np.tensordot(x,r_uneval,(0,0)), (0,1))
+        result = np.sum(np.abs(l - r))
+        return result
+
+
+    def irrep_defect_identity(self,irrep):
+        return np.sum(np.abs(np.tensordot(self.unit, irrep, (0,0)) - np.identity(irrep.shape[1])))
+
+    def irrep_defect(self,irrep):
+        return sum([ self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_multiplication(irrep),
+                     self.irrep_defect_identity(irrep)])
+
+    def multiply(self, x, y):
+        return self.multiplication_matrix * (np.kron(x,y)).flatten()
+
+    def random_vector(self):
+        d = self.dimension
+        return (np.random.rand(d) - 0.5 ) + 1j * (np.random.rand(d) - 0.5 )
+
+    def commutator_matrix(self):
+        d = self.dimension
+
+
+        l = sparse.hstack(
+            [lm.reshape(d * d, 1)
+             for lm in self.left_multiplication_matrices])
+
+        r = sparse.hstack(
+            [rm.reshape(d * d, 1)
+             for rm in self.right_multiplication_matrices])
+
+        return l - r
+
+    def mult_helper(self,v, ms):
+        # ms is a list of sparse matrices
+        d = self.dimension
+        accumulator = np.zeros((d,d), dtype=complex)
+
+        for (c, m) in zip(v, ms):
+            accumulator += c * m.todense()
+
+        return accumulator
+
+    def left_multiplication_matrix(self,v):
+        return self.mult_helper(v, self.left_multiplication_matrices)
+
+    def right_multiplication_matrix(self,v):
+        return self.mult_helper(v, self.right_multiplication_matrices)
+
+
+    def __init__(
+            self,
+            dimension,
+            left_multiplication_matrices,
+            right_multiplication_matrices,
+            unit):
+
+        # dimension of algebra
+        # we denote the basis vectors as e_1, e_2, ...., e_dimension
+        self.dimension = dimension
+
+        # list of matrices
+        # jth column of ith matrix is e_i e_j
+        self.left_multiplication_matrices = left_multiplication_matrices
+
+        # list of matrices
+        # jth column of ith matrix is e_j e_i
+        self.right_multiplication_matrices = right_multiplication_matrices
+
+        # useful optimization for implementing multiply
+        self.multiplication_matrix = sparse.hstack(left_multiplication_matrices)
+
+        # unit of algebra. Dense numpy array
+        self.unit = unit
 
 
 class Algebra:
@@ -417,6 +456,7 @@ class Algebra:
         return result
 
     def irrep_defect_identity(self,irrep):
+        m = self.multiplication
         result = np.sum(np.abs(np.tensordot(self.unit, irrep, (0,0)) - np.identity(irrep.shape[1])))
         return result
 
@@ -448,8 +488,7 @@ class Algebra:
             self,
             dimension,
             multiplication,
-            unit,
-            is_sparse = False
+            unit
     ):
 
         # dimension of algebra
@@ -463,7 +502,6 @@ class Algebra:
         # unit of the algebra in the given basis
         self.unit = unit
 
-        self.is_sparse = is_sparse
 
 
 
@@ -471,17 +509,14 @@ def load_sparse_algebra_from_file(path):
     with open(path,'r') as f:
         lines = f.readlines()
 
-    identity_vec = [int(x) for x in lines[0].split(' ')]
-    dim = len(identity_vec)
-    unit_coefficients = []
-    for (index, val) in enumerate(identity_vec):
-        if val != 0:
-            unit_coefficients.append(((index,),float(val)))
+    unit = np.array([complex(x) for x in lines[0].split(' ')])
+    dimension = len(unit)
 
-    unit = sparse.COO.from_iter(unit_coefficients, shape = (dim,), dtype=complex)
 
     multiplication_lines = lines[1:]
-    multiplication_coefficients = []
+    left_multiplication_data = [([],([],[])) for _ in range(dimension)]
+    right_multiplication_data = [([],([],[])) for _ in range(dimension)]
+
     for line in multiplication_lines:
         parts = line.split(' ')
         i = int(parts[0])
@@ -489,89 +524,29 @@ def load_sparse_algebra_from_file(path):
         k = int(parts[2])
         val_real = float(parts[3])
         val_imaginary = float(parts[4])
-        multiplication_coefficients.append(((i,j,k),complex(val_real,  val_imaginary) ))
-
-    mult = sparse.COO.from_iter(multiplication_coefficients, shape=(dim,dim,dim), dtype=complex)
-
-    alg = Algebra(dim, mult, unit, is_sparse=True)
-    return alg
+        val = complex(val_real, val_imaginary)
 
 
-
-# we represent a permutation as an n-tuple containing the numbers 0,1,...,n-1
-# if we think of such a tuple as a function from indices to values
-# then permutations are composed via function composition as follows
-def multiply_permutations(p2, p1):
-    return tuple([p2[i] for i in p1])
+        left_multiplication_data[i][0].append(val)
+        left_multiplication_data[i][1][0].append(k)
+        left_multiplication_data[i][1][1].append(j)
 
 
-def sparse_symmetric_group_algebra(n):
-    dimension = factorial(n)
-    multiplication = []
-    unit = []
+        right_multiplication_data[j][0].append(val)
+        right_multiplication_data[j][1][0].append(k)
+        right_multiplication_data[j][1][1].append(i)
 
+    left_multiplication_matrices = [
+        sparse.coo_matrix(m, dtype=complex, shape=(dimension,dimension))
+        for m in left_multiplication_data]
 
-    permutation_to_index = {}
-    index_to_permutation = {}
-    index = 0
+    right_multiplication_matrices = [
+        sparse.coo_matrix(m, dtype=complex, shape=(dimension,dimension))
+        for m in right_multiplication_data]
 
-
-
-    for permutation in permutations(range(n)):
-        permutation_to_index[permutation] = index
-        index_to_permutation[index] = permutation
-        index += 1
-
-
-    identity_permutation = tuple(range(n))
-    unit.append(
-        ((permutation_to_index[identity_permutation],),1.0))
-
-    for i in range(dimension):
-        for j in range(dimension):
-            pi = index_to_permutation[i]
-            pj = index_to_permutation[j]
-            pk = multiply_permutations(pi,pj)
-
-            multiplication.append(
-                ((i,j,permutation_to_index[pk]), 1.0))
-
-    algebra = Algebra(dimension,
-                      sparse.COO.from_iter(
-                          multiplication,
-                          shape = (dimension,dimension,dimension),
-                          dtype = complex),
-                      sparse.COO.from_iter(
-                          unit,
-                          shape = (dimension,),
-                          dtype = complex),
-                      is_sparse = True
-                      )
-
-    return algebra
-
-def symmetric_group_algebra(n):
-    algebra = sparse_symmetric_group_algebra(n)
-    algebra.multiplication = algebra.multiplication.todense()
-    algebra.unit = algebra.unit.todense()
-    algebra.is_sparse = False
-    return algebra
-
-def dump_sparse_algebra(a, path):
-    with open(path, 'w') as f:
-        for x in a.unit:
-            f.write(str(int(x)) + ' ')
-
-        f.write('\n')
-        for i in range(a.dimension):
-            for j in range(a.dimension):
-                for k in range(a.dimension):
-                    val = a.multiplication[i,j,k]
-                    if val != 0.0:
-                        f.write(str(i) + ' ')
-                        f.write(str(j) + ' ')
-                        f.write(str(k) + ' ')
-                        f.write(str(val.real) + ' ')
-                        f.write(str(val.imag) + '\n')
-
+    return SparseAlgebra(
+        dimension,
+        left_multiplication_matrices,
+        right_multiplication_matrices,
+        unit)
 
