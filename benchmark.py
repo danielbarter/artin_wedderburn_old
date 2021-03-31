@@ -23,6 +23,6 @@ for path in algebra_files:
 
 
     print("\n",end='')
-    print("total defect = ", aw.total_defect)
+    print("total defect = ", format_error(aw.total_defect))
     print("\n")
 
