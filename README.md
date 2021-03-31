@@ -20,7 +20,7 @@ You can compute the irreducible representations of S4 as follows:
 
 ```
 from ArtinWedderburn import *
-alg = symmetric_group_algebra(4)
+alg = load_algebra_from_file('./symmetric_groups/4')
 aw = ArtinWedderburn(alg, logging=True)
 ```
 
@@ -30,7 +30,7 @@ if you are looking for something more exotic, Jacob Bridgeman has computed the t
 python benchmark.py small_tube_algebras
 ```
 
-This runs in 6 minutes with a max ram usage of 16.5GB on a Intel Xeon W-1290 CPU.
+This runs in 2 minutes, 30 seconds with a max ram usage of 460MB on a Intel Xeon W-1290 CPU.
 
 
 ### dependencies
