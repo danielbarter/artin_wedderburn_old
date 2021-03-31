@@ -184,6 +184,10 @@ class ArtinWedderburn:
         self.log("SVD defect:", format_error(m_defect))
         self.total_defect += m_defect
 
+        block_irrep_defect = block.irrep_defect(block_irrep)
+        self.log("block irred defect:", format_error(block_irrep_defect))
+        self.total_defect += block_irrep_defect
+
         irrep = np.tensordot(projection, block_irrep, (0,0))
         self.irreps[block_index] = irrep
 
@@ -340,9 +344,15 @@ class SparseAlgebra:
         x = self.random_vector()
         y = self.random_vector()
         xy = self.multiply(x,y)
+
+        # irrep[i,j] is the vector e_i b_j
         l = np.tensordot(xy, irrep, (0,0))
+
         r_uneval = np.tensordot(irrep, irrep, (2,1))
-        r = np.tensordot(y, np.tensordot(x,r_uneval,(0,0)), (0,1))
+
+        # this is backwards because irrep[i] is the transpose of
+        # what would conventionally be called the action matrix
+        r = np.tensordot(y, np.tensordot(x, r_uneval, (0,0)), (0,1))
         result = np.sum(np.abs(l - r))
         return result
 
@@ -357,7 +367,7 @@ class SparseAlgebra:
                      self.irrep_defect_identity(irrep)])
 
     def multiply(self, x, y):
-        return self.multiplication_matrix * (np.kron(x,y)).flatten()
+        return self.multiplication_matrix * np.kron(x,y)
 
     def random_vector(self):
         d = self.dimension
@@ -392,7 +402,6 @@ class SparseAlgebra:
 
     def right_multiplication_matrix(self,v):
         return self.mult_helper(v, self.right_multiplication_matrices)
-
 
     def __init__(
             self,
