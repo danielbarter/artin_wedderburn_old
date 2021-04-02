@@ -24,7 +24,7 @@ alg = load_algebra_from_file('./symmetric_groups/4')
 aw = ArtinWedderburn(alg, logging=True)
 ```
 
-if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 7: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). There are 196 such algebras in total with dimensions ranging from 4 to 301. The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
+if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 7: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). There are 195 such algebras in total with dimensions ranging from 4 to 301. The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
 
 ```
 python benchmark.py small_tube_algebras
