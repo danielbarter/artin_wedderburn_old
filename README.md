@@ -20,19 +20,27 @@ You can compute the irreducible representations of S4 as follows:
 
 ```
 from ArtinWedderburn import *
-alg = symmetric_group_algebra(4)
+alg = load_algebra_from_file('./symmetric_groups/4')
 aw = ArtinWedderburn(alg, logging=True)
 ```
 
-if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 7: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
+if you are looking for something more exotic, Jacob Bridgeman has computed the tube algebras for all multiplicity free unitary fusion categories of rank < 7: [10.5281/zenodo.4277499](https://zenodo.org/record/4277499). There are 195 such algebras in total with dimensions ranging from 4 to 301. The algebras are stored in sparse format in the folder `small_tube_algebras`. All of their irreducible representations can be computed like this:
 
 ```
 python benchmark.py small_tube_algebras
 ```
 
-This runs in 6 minutes with a max ram usage of 16.5GB on a Intel Xeon W-1290 CPU.
+This runs in 2 minutes with a max ram usage of 328MB on a Intel Xeon W-1290 CPU. We have also compute the irreps of some larger algebras on a Intel Xeon E5-2670 CPU:
 
+| dimension  | time (mins) | max ram usage (GB) |
+|     ---    |     ----    |       ---          |
+| 783 | 16 | 4 |
+| 910 | 22 | 7 |
+| 1112 | 93 | 10 |
+| 1547 | 517 | 24 |
+
+Each of these algebras has 6 irreps.
 
 ### dependencies
 
-ArtinWedderburn uses `numpy` for tensor arithmetic, `sparse` for sparse tensor arithmetic and `scipy` for SVDs and computing eigenvalues. It should work with any recent versions of those libraries.
+ArtinWedderburn uses `numpy` for tensor arithmetic and `scipy` for sparse matrices, SVDs and computing eigenvalues. It should work with any recent versions of those libraries.

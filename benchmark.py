@@ -1,6 +1,6 @@
 import sys
 import os
-from ArtinWedderburnV2 import *
+from ArtinWedderburn import *
 
 
 if len(sys.argv) != 2:
@@ -12,7 +12,7 @@ os.chdir(directory)
 algebra_files = os.listdir()
 
 for path in algebra_files:
-    alg = load_sparse_algebra_from_file(path)
+    alg = load_algebra_from_file(path)
     aw = ArtinWedderburn(alg)
     print(path)
     print("algebra dimension = ", alg.dimension)
@@ -23,6 +23,6 @@ for path in algebra_files:
 
 
     print("\n",end='')
-    print("total defect = ", aw.total_defect)
+    print("total defect = ", format_error(aw.total_defect))
     print("\n")
 
