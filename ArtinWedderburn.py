@@ -53,7 +53,6 @@ class ArtinWedderburn:
         self.log("center defect:", format_error(center_defect))
         self.total_defect += center_defect
 
-
     def compute_unscaled_central_idempotents(self):
         algebra = self.algebra
         center = self.center
@@ -77,19 +76,24 @@ class ArtinWedderburn:
 
         self.unscaled_central_idempotents = unscaled_central_idempotents
 
+    def eigenspace(self, matrix):
+        eigvals, eigvecs = eigh(np.dot(matrix, np.transpose(matrix.conjugate())))
+        u = np.flip(eigvecs, 1)
+        s = np.flip(eigvals, 0)
+        return u, s
 
     def compute_block(self, idempotent_index):
         algebra = self.algebra
-        idempotent = self.unscaled_central_idempotents[:,idempotent_index]
+        idempotent = self.unscaled_central_idempotents[:, idempotent_index]
         left_multiplication = algebra.left_multiplication_matrix(idempotent)
 
-
         # u is the change of basis from new basis to old basis
-        u,s,v =  svd(left_multiplication)
+        # u, s, v = svd(left_multiplication)
+        u, s = self.eigenspace(left_multiplication)
 
         # u is unitary, so inverse is conjugate transpose
         # u_inverse is change of basis from old basis to new basis
-        u_inverse = np.transpose(np.conj(u))
+        # u_inverse = np.transpose(np.conj(u))
 
         # the basis for the block is the columns of u whose singular value
         # is above the threshold
@@ -118,7 +122,7 @@ class ArtinWedderburn:
             block_multiplication,
             block_pre_unit)
 
-        # we have only captured the identity upto scalar multiplication
+        # we have only captured the identity up to scalar multiplication
         # we need the identity on the node if we want to recover the correct scale
         # for the representations
         factor = pre_block.left_multiplication_matrix(pre_block.unit)[0,0]
@@ -166,7 +170,8 @@ class ArtinWedderburn:
             proj = block.right_multiplication_matrix(accumulator)
 
             # u goes from new basis to old basis
-            u, s, v = svd(proj)
+            # u, s, v = svd(proj)
+            u, s = self.eigenspace(proj)
 
             # u_inverse goes from old basis to new basis
             u_inverse = np.transpose(np.conj(u))
