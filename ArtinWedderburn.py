@@ -22,6 +22,14 @@ def fuzzy_filter(array, threshold):
 def format_error(x):
     return str.format('{0:1.0e}' ,x)
 
+
+def eigenspace(matrix):
+    eigvals, eigvecs = eigh(np.dot(matrix, np.transpose(matrix.conjugate())))
+    u = np.flip(eigvecs, 1)
+    s = np.flip(eigvals, 0)
+    return u, s
+
+
 class ArtinWedderburn:
     def compute_center(self):
         algebra = self.algebra
@@ -76,12 +84,6 @@ class ArtinWedderburn:
 
         self.unscaled_central_idempotents = unscaled_central_idempotents
 
-    def eigenspace(self, matrix):
-        eigvals, eigvecs = eigh(np.dot(matrix, np.transpose(matrix.conjugate())))
-        u = np.flip(eigvecs, 1)
-        s = np.flip(eigvals, 0)
-        return u, s
-
     def compute_block(self, idempotent_index):
         algebra = self.algebra
         idempotent = self.unscaled_central_idempotents[:, idempotent_index]
@@ -89,7 +91,7 @@ class ArtinWedderburn:
 
         # u is the change of basis from new basis to old basis
         # u, s, v = svd(left_multiplication)
-        u, s = self.eigenspace(left_multiplication)
+        u, s = eigenspace(left_multiplication)
 
         # u is unitary, so inverse is conjugate transpose
         # u_inverse is change of basis from old basis to new basis
@@ -171,7 +173,7 @@ class ArtinWedderburn:
 
             # u goes from new basis to old basis
             # u, s, v = svd(proj)
-            u, s = self.eigenspace(proj)
+            u, s = eigenspace(proj)
 
             # u_inverse goes from old basis to new basis
             u_inverse = np.transpose(np.conj(u))
