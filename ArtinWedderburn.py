@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sparse
-from scipy.linalg import eigh, eig, svd
-from math import factorial, sqrt
+from scipy.linalg import eigh, eig
+from math import sqrt
 
 # takes an array of complex numbers and removes duplicates upto threshold
 def fuzzy_filter(array, threshold):
@@ -23,7 +23,7 @@ def format_error(x):
     return str.format('{0:1.0e}' ,x)
 
 
-def eigenspace(matrix):
+def one_sided_svd(matrix):
     eigvals, eigvecs = eigh(np.dot(matrix, np.transpose(matrix.conjugate())))
     u = np.flip(eigvecs, 1)
     s = np.flip(eigvals, 0)
@@ -91,7 +91,7 @@ class ArtinWedderburn:
 
         # u is the change of basis from new basis to old basis
         # u, s, v = svd(left_multiplication)
-        u, s = eigenspace(left_multiplication)
+        u, s = one_sided_svd(left_multiplication)
 
         # u is unitary, so inverse is conjugate transpose
         # u_inverse is change of basis from old basis to new basis
@@ -173,7 +173,7 @@ class ArtinWedderburn:
 
             # u goes from new basis to old basis
             # u, s, v = svd(proj)
-            u, s = eigenspace(proj)
+            u, s = one_sided_svd(proj)
 
             # u_inverse goes from old basis to new basis
             u_inverse = np.transpose(np.conj(u))
