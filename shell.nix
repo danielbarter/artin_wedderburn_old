@@ -5,7 +5,7 @@ let pythonEnv = python38.withPackages (
             ps.scipy
           ]);
 
-in mkShell rec {
+in mkShell {
 
   buildInputs = [ pythonEnv
                 ];
